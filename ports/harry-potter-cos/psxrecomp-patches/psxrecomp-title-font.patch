@@ -1,0 +1,176 @@
+diff --git a/runtime/runtime.cmake b/runtime/runtime.cmake
+index c9b3e69f..8486b3af 100644
+--- a/runtime/runtime.cmake
++++ b/runtime/runtime.cmake
+@@ -555,6 +555,16 @@ set(PSXRECOMP_RUNTIME_SOURCES
+     # (sljit Tier-2 in-process JIT backend removed 2026-07-15 — was disabled by
+     # default since 2026-06-25; gaps fall to the interpreter, gcc/tcc unaffected.)
+ )
++
++# macOS: optional custom title-bar font (PSX_WINDOW_TITLE_FONT=<ttf>).
++# Built by the C++ compiler as Objective-C++ so no OBJCXX language is needed.
++if(APPLE)
++    list(APPEND PSXRECOMP_RUNTIME_SOURCES
++        ${PSXRECOMP_ROOT}/runtime/src/psx_title_font_mac.mm)
++    set_source_files_properties(${PSXRECOMP_ROOT}/runtime/src/psx_title_font_mac.mm
++        PROPERTIES LANGUAGE CXX COMPILE_OPTIONS "-xobjective-c++;-fobjc-arc"
++                   SKIP_PRECOMPILE_HEADERS ON)
++endif()
+ # TCP `disasm` command only (debug_server.c); development-only even when the
+ # production TCP listener is opted in.
+ if(PSX_DEBUG_TOOLS)
+@@ -2414,6 +2424,9 @@ function(psxrecomp_add_runtime_target target)
+         if(CMAKE_DL_LIBS)
+             target_link_libraries(${target} PRIVATE ${CMAKE_DL_LIBS})
+         endif()
++        if(APPLE)
++            target_link_libraries(${target} PRIVATE "-framework AppKit" "-framework CoreText")
++        endif()
+         # GL for gpu_gl_renderer.c. Do NOT hardcode OpenGL::GL: FindOpenGL
+         # reports OpenGL as found on a GLVND host that has libOpenGL.so but no
+         # legacy libGL.so / glx.h (Steam Deck), yet never creates that target —
+diff --git a/runtime/src/main.cpp b/runtime/src/main.cpp
+index 02707c19..84389a68 100644
+--- a/runtime/src/main.cpp
++++ b/runtime/src/main.cpp
+@@ -162,6 +162,10 @@ extern "C" uint32_t g_guest_last_store_addr, g_guest_last_store_val;
+ #include "psx_host_menu.h"
+ #include "psx_menu_host.h"     /* optional in-game menu hooks (P1 pause, ...) */    /* configurable keyboard->DualShock keybinds (keybinds.ini) */
+ #include "psx_window_icon.h"
++#ifdef __APPLE__
++/* psx_title_font_mac.mm: PSX_WINDOW_TITLE_FONT=<ttf> custom title-bar font. */
++extern "C" void psx_title_font_apply(SDL_Window *window);
++#endif
+ 
+ #if defined(RECOMP_LAUNCHER)
+ #include "recomp_launcher.h"   /* shared recomp-ui Dear ImGui launcher */
+@@ -21238,6 +21245,9 @@ session_reboot:
+         return 1;
+     }
+     psx_apply_window_icon(sdl_window, argv[0]);
++#ifdef __APPLE__
++    psx_title_font_apply(sdl_window);
++#endif
+     s_window_fullscreen = {};
+     if (psx_window_fullscreen_set(sdl_window, &s_window_fullscreen, g_fullscreen) != 0)
+         std::fprintf(stderr, "Fullscreen setup failed: %s\n", SDL_GetError());
+diff --git a/runtime/src/psx_title_font_mac.mm b/runtime/src/psx_title_font_mac.mm
+new file mode 100644
+index 00000000..24ac248e
+--- /dev/null
++++ b/runtime/src/psx_title_font_mac.mm
+@@ -0,0 +1,114 @@
++// Draws the window title in a game-supplied font (macOS only).
++//
++// PSX_WINDOW_TITLE_FONT=/path/to/font.ttf  registers that font for this process
++// PSX_WINDOW_TITLE_FONT_SIZE=18            point size (default 17)
++// The native title is hidden (it stays set, so Mission Control and the Dock still
++// show it) and a centered label in the title bar shows the same text instead.
++// The label follows later SDL_SetWindowTitle calls by observing NSWindow.title.
++// No effect when PSX_WINDOW_TITLE_FONT is unset or the font cannot be loaded.
++
++#import <AppKit/AppKit.h>
++#import <CoreText/CoreText.h>
++
++#include <SDL3/SDL.h>
++
++#include <cstdlib>
++
++static NSString* const kPsxTitleLabelId = @"psx.styled-title";
++
++static NSFont* PsxTitleFont() {
++  static NSFont* font = nil;
++  static bool tried = false;
++  if (tried) {
++    return font;
++  }
++  tried = true;
++  const char* path = std::getenv("PSX_WINDOW_TITLE_FONT");
++  if (!path || !*path) {
++    return nil;
++  }
++  NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path]];
++  CFArrayRef descriptors = CTFontManagerCreateFontDescriptorsFromURL((__bridge CFURLRef)url);
++  if (!descriptors || CFArrayGetCount(descriptors) == 0) {
++    if (descriptors) CFRelease(descriptors);
++    return nil;
++  }
++  CTFontManagerRegisterFontsForURL((__bridge CFURLRef)url, kCTFontManagerScopeProcess, nullptr);
++  const char* size_env = std::getenv("PSX_WINDOW_TITLE_FONT_SIZE");
++  CGFloat size = size_env ? std::atof(size_env) : 17.0;
++  auto desc = (CTFontDescriptorRef)CFArrayGetValueAtIndex(descriptors, 0);
++  CTFontRef ct = CTFontCreateWithFontDescriptor(desc, size > 0 ? size : 17.0, nullptr);
++  CFRelease(descriptors);
++  font = (__bridge_transfer NSFont*)ct;
++  return font;
++}
++
++static void PsxTitleSync(NSWindow* window) {
++  NSView* bar = [window standardWindowButton:NSWindowCloseButton].superview;
++  if (!bar) {
++    return;
++  }
++  window.titleVisibility = NSWindowTitleHidden;
++  NSTextField* label = nil;
++  for (NSView* v in bar.subviews) {
++    if ([v.identifier isEqualToString:kPsxTitleLabelId]) label = (NSTextField*)v;
++  }
++  if (!label) {
++    label = [NSTextField labelWithString:@""];
++    label.identifier = kPsxTitleLabelId;
++    label.font = PsxTitleFont();
++    label.alignment = NSTextAlignmentCenter;
++    label.lineBreakMode = NSLineBreakByTruncatingTail;
++    label.translatesAutoresizingMaskIntoConstraints = NO;
++    [bar addSubview:label];
++    [NSLayoutConstraint activateConstraints:@[
++      [label.centerXAnchor constraintEqualToAnchor:bar.centerXAnchor],
++      [label.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
++      [label.widthAnchor constraintLessThanOrEqualToAnchor:bar.widthAnchor constant:-160],
++    ]];
++  }
++  label.stringValue = window.title ?: @"";
++}
++
++@interface PsxTitleObserver : NSObject
++@end
++
++@implementation PsxTitleObserver
++- (void)observeValueForKeyPath:(NSString*)keyPath
++                      ofObject:(id)object
++                        change:(NSDictionary*)change
++                       context:(void*)context {
++  NSWindow* window = (NSWindow*)object;
++  if ([NSThread isMainThread]) {
++    PsxTitleSync(window);
++  } else {
++    dispatch_async(dispatch_get_main_queue(), ^{ PsxTitleSync(window); });
++  }
++}
++@end
++
++extern "C" void psx_title_font_apply(SDL_Window* sdl_window) {
++  if (!sdl_window || !PsxTitleFont()) {
++    return;
++  }
++  void* ptr = SDL_GetPointerProperty(SDL_GetWindowProperties(sdl_window),
++                                     SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, nullptr);
++  if (!ptr) {
++    return;
++  }
++  NSWindow* window = (__bridge NSWindow*)ptr;
++  dispatch_block_t apply = ^{
++    static PsxTitleObserver* observer = nil;
++    static NSHashTable<NSWindow*>* observed = nil;
++    if (!observer) {
++      observer = [PsxTitleObserver new];
++      observed = [NSHashTable weakObjectsHashTable];
++    }
++    if (![observed containsObject:window]) {
++      [observed addObject:window];
++      [window addObserver:observer forKeyPath:@"title" options:0 context:nullptr];
++    }
++    PsxTitleSync(window);
++  };
++  if ([NSThread isMainThread]) apply(); else dispatch_async(dispatch_get_main_queue(), apply);
++}

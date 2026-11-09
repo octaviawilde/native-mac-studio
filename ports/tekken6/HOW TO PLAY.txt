@@ -1,0 +1,45 @@
+TEKKEN 6 for Mac
+================
+
+Needs: a Mac with Apple Silicon (M1, M2, M3, M4 or newer) and macOS 14 Sonoma or newer.
+No internet needed, nothing else to install.
+
+Copy to another Mac
+-------------------
+1. Copy "Tekken 6.app" to a USB stick (about 7 GB; any stick format works).
+2. On the other Mac, drag "Tekken 6.app" into its Applications folder.
+3. Double-click it. The very first start takes about a minute while macOS checks the new app.
+   After that it starts in a second.
+
+If macOS says the app "can't be opened" or is "from an unidentified developer":
+   Open System Settings > Privacy & Security, scroll down, and click "Open Anyway"
+   next to the Tekken 6 message. (This can happen when the app arrives by AirDrop or a
+   download instead of a USB stick.) You only need to do this once.
+
+Controls
+--------
+PS5 DualSense (USB-C or Bluetooth, connect before or after starting; click the game window first):
+   Square = left punch    Triangle = right punch    Cross = left kick    Circle = right kick
+   Options = Start / pause    D-pad or left stick = move    L1 R1 L2 R2 as on Xbox
+Nintendo Switch Joy-Cons (pair in System Settings > Bluetooth: hold the small sync button on the
+Joy-Con's rail until the lights run):
+   A left + right Joy-Con together = one controller (the default).
+   Co-op: press F6 on the keyboard. Each Joy-Con becomes its own controller, held sideways,
+   so two people can play with one pair. Press F6 again to pair them back up.
+   The window title shows "[Joy-Cons: co-op]" while co-op mode is on; the choice is remembered.
+   Buttons work by position, like an Xbox pad: bottom = kick (left), right = kick (right),
+   left = punch (left), top = punch (right); + = Start.
+Keyboard:
+   Arrows = menus and movement    Return = Start    Space = confirm    Escape = back
+   U / I / J / K = left punch / right punch / left kick / right kick
+   F3 = show frame rate    F6 = Joy-Con co-op mode on/off
+
+Saves and settings
+------------------
+Saves, shader cache and logs are stored per Mac in:
+   ~/Library/Application Support/Tekken6
+   ~/Library/Logs/Tekken6
+The app itself is never changed, so you can replace it with a newer copy at any time.
+To move your saves to the other Mac, copy the "user" folder inside Application Support/Tekken6.
+
+Quit with Cmd+Q or by closing the window.

@@ -1,0 +1,22 @@
+--- a/spirv_msl.cpp
++++ b/spirv_msl.cpp
+@@ -22,6 +22,7 @@
+  */
+ 
+ #include "spirv_msl.hpp"
++#include <cstdlib>
+ #include "GLSL.std.450.h"
+ 
+ #include <algorithm>
+@@ -14500,6 +14501,11 @@
+ 				else
+ 					addr_space = "device";
+ 			}
++			else if (getenv("REX_MSL_UBO_AS_DEVICE"))
++				// Apple M1/M2 GPUs misread dynamically indexed constant-space arrays (skinning bone
++				// tables, seen as stretched faces in Alice: Madness Returns); device memory reads
++				// them correctly. The launcher sets this on those chips only.
++				addr_space = "const device";
+ 			else
+ 				addr_space = "constant";
+ 		}

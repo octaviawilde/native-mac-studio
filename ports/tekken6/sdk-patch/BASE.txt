@@ -1,0 +1,1 @@
+upstream https://github.com/rexglue/rexglue-sdk.git @ 0c7b01a0ac0479801757507d80533f662fa0815d

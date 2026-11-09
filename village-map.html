@@ -1,0 +1,133 @@
+<title>Native Mac Studio Village</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Karla:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: a night-time village map (SVG) with a details panel; houses sized by effort, placed by working distance. */
+:root {
+  --night: #101820; --ground: #17242d; --ground-2: #1d2e38; --road: #3a4c56;
+  --lamp: #f2b84b; --roof: #c8553d; --wall: #e8dcc8; --ink: #e9eef0; --muted: #93a6ae;
+  --plot: #4f6b77; --display: "Fraunces", Georgia, serif; --body: "Karla", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace; color-scheme: dark;
+}
+body { background: var(--night); color: var(--ink); font-family: var(--body); margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header h1 { font-family: var(--display); font-weight: 600; font-size: clamp(28px, 4vw, 44px); margin: 0 0 6px; text-wrap: balance; }
+header p { color: var(--muted); margin: 0 0 20px; max-width: 65ch; line-height: 1.5; }
+.layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+.map { background: var(--ground); border-radius: 14px; overflow: hidden; }
+.map svg { display: block; width: 100%; height: auto; }
+.house { cursor: pointer; }
+.house:focus { outline: none; }
+.house:focus-visible .walls, .house.active .walls { stroke: var(--lamp); stroke-width: 3; }
+.label { font-family: var(--body); font-weight: 600; fill: var(--ink); font-size: 13px; }
+.size { font-family: var(--mono); fill: var(--muted); font-size: 10px; }
+.panel { background: var(--ground-2); border-radius: 14px; padding: 20px; min-width: 0; }
+.panel .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--lamp); }
+.panel h2 { font-family: var(--display); font-weight: 600; font-size: 24px; margin: 6px 0 4px; }
+.panel .agent { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.panel p, .panel li { line-height: 1.5; }
+.panel ul { padding-left: 18px; margin: 8px 0 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; color: var(--muted); font-size: 13px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--roof); }
+.legend .plot::before { background: transparent; border: 1.5px dashed var(--plot); }
+.legend .road::before { background: var(--road); height: 4px; vertical-align: 2px; }
+@media (prefers-reduced-motion: no-preference) { .glow { animation: flicker 3.4s ease-in-out infinite; } }
+@keyframes flicker { 0%,100% { opacity: .9 } 50% { opacity: .6 } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Native Mac Studio Village</h1>
+    <p>Each house is a body of work the studio built while bringing Tekken 6 to the Mac. Bigger houses took more effort; houses that worked closely sit near each other, joined by roads. Dashed plots are projects waiting to be built. Select a house to see what lives there.</p>
+  </header>
+  <div class="layout">
+    <div class="map">
+      <svg viewBox="0 0 800 560" role="img" aria-label="Village map of the studio's houses" id="map">
+        <rect width="800" height="560" fill="var(--ground)"/>
+        <g id="roads" stroke="var(--road)" stroke-width="6" stroke-linecap="round" fill="none"></g>
+        <g id="plots"></g>
+        <g id="houses"></g>
+      </svg>
+    </div>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+  <div class="legend"><span>House (size = effort)</span><span class="road">Road (worked together)</span><span class="plot">Empty plot (next project)</span></div>
+</div>
+
+<script>
+const houses = [
+  { id:"hall", name:"Village Hall", agent:"studio-lead", size:"Hall", s:46, x:400, y:280, order:"Founded last, to route everything",
+    text:"Plans new requests and sends them to the right houses. Founds a new house when nothing fits.",
+    notes:["Reads VILLAGE.md and the house playbooks","Next up: Alice: Madness Returns and the screen-drawing toolkit"] },
+  { id:"recomp", name:"Xbox 360 Recompilation", agent:"xbox360-recompiler", size:"L", s:62, x:215, y:170, order:"1st: first build and the black screen",
+    text:"Turns an Xbox 360 game into a native Apple Silicon program with the ReXGlue recompiler.",
+    notes:["Fixed lost wakeups in event emulation (black screen, loading freezes)","Real ARM memory barriers for PowerPC sync instructions","Extracts the game's own icon from the XEX"] },
+  { id:"gpu", name:"GPU & Graphics", agent:"mac-gpu-engineer", size:"XL", s:78, x:390, y:110, order:"2nd: white and cyan 3D, black fights",
+    text:"Makes translated Xbox graphics come out right on Metal.",
+    notes:["Texture brightness bug and dropped strip draws (upstream fixes)","Black-flicker fights: unclipped depth-clear draw","Tools: in-app captures, per-frame draw logs, shader dumps"] },
+  { id:"input", name:"Input & Controllers", agent:"mac-input-engineer", size:"M", s:48, x:640, y:400, order:"3rd: keyboard, then DualSense, then Joy-Cons",
+    text:"Keyboard, PS5 DualSense and Nintendo Joy-Cons, with players kept on the right slots.",
+    notes:["F6 toggles Joy-Cons between one paired controller and co-op","Virtual DualSense proves input without hardware"] },
+  { id:"qa", name:"QA Lab", agent:"mac-qa-tester", size:"L", s:60, x:560, y:250, order:"4th: needed to test without a person at the keyboard",
+    text:"Lets the studio play and judge the game on its own.",
+    notes:["Scripted virtual controller fights through Arcade","Contact sheets and one-line frame-time verdicts","Mutes audio and never closes your game"] },
+  { id:"research", name:"Research", agent:"studio-researcher", size:"M", s:46, x:250, y:345, order:"5th: upstream issues kept matching our bugs",
+    text:"Finds known fixes and prior art before anything gets built.",
+    notes:["Six upstream issues matched Tekken bugs exactly","REA and Ghidra noted for future reverse engineering"] },
+  { id:"perf", name:"Performance & Timing", agent:"mac-perf-engineer", size:"XL", s:76, x:600, y:105, order:"6th: fights stuttered and ran below 60 fps",
+    text:"Took fights from 35–48 fps with stutter to about 59 fps.",
+    notes:["Performance-core scheduling and precise 60 Hz timing","Apple Silicon compiler tuning: +3–7 fps","Knockout tests proved the GPU wasn't the limit"] },
+  { id:"pack", name:"Packaging & Distribution", agent:"mac-packager", size:"M", s:50, x:430, y:440, order:"7th: sharing the game on a USB stick",
+    text:"Builds a drag-and-drop app for any Apple Silicon Mac on macOS 14 or newer.",
+    notes:["Self-contained Tekken 6.app with HOW TO PLAY","Saves live in Application Support, app stays read-only"] },
+  { id:"house", name:"Housekeeping", agent:"mac-caretaker", size:"S", s:34, x:250, y:480, order:"8th: disk at 91%",
+    text:"Frees space without losing anything important.",
+    notes:["Freed 44 GB; everything went to the Trash first"] },
+  { id:"identity", name:"Identity", agent:"mac-caretaker", size:"S", s:34, x:590, y:500, order:"9th: icon and window title",
+    text:"The look: the app icon and the window title.",
+    notes:["Window titles in a font that fits the game","Icons carry no box art or console branding"] },
+];
+const roads = [["recomp","gpu"],["recomp","research"],["gpu","qa"],["gpu","perf"],["gpu","research"],["qa","perf"],["qa","input"],["perf","pack"],["pack","identity"],["pack","house"],["research","hall"],["hall","qa"],["hall","pack"],["hall","recomp"]];
+const plots = [
+  { name:"Alice: Madness Returns", note:"Next game (Xbox 360)", x:95, y:80 },
+  { name:"Screen-drawing toolkit", note:"New branch: creative tools", x:730, y:270 },
+];
+const NS = "http://www.w3.org/2000/svg";
+const el = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); p && p.appendChild(e); return e; };
+const byId = Object.fromEntries(houses.map(h => [h.id, h]));
+const roadG = document.getElementById("roads");
+roads.forEach(([a,b]) => { const A = byId[a], B = byId[b]; el("path", { d:`M${A.x} ${A.y} Q${(A.x+B.x)/2+12} ${(A.y+B.y)/2-12} ${B.x} ${B.y}` }, roadG); });
+const plotG = document.getElementById("plots");
+plots.forEach(p => {
+  el("rect", { x:p.x-38, y:p.y-26, width:76, height:52, rx:6, fill:"none", stroke:"var(--plot)", "stroke-width":1.5, "stroke-dasharray":"5 4" }, plotG);
+  const t = el("text", { x:p.x, y:p.y+44, "text-anchor":"middle", class:"label" }, plotG); t.textContent = p.name;
+  const n = el("text", { x:p.x, y:p.y+58, "text-anchor":"middle", class:"size" }, plotG); n.textContent = p.note;
+});
+const houseG = document.getElementById("houses");
+houses.forEach(h => {
+  const g = el("g", { class:"house", tabindex:0, role:"button", "aria-label":h.name, "data-id":h.id }, houseG);
+  const w = h.s, hh = h.s*0.62;
+  el("circle", { cx:h.x, cy:h.y, r:w*0.9, fill:"var(--lamp)", opacity:.08, class:"glow" }, g);
+  el("rect", { x:h.x-w/2, y:h.y-hh/2, width:w, height:hh, rx:3, fill:"var(--wall)", class:"walls" }, g);
+  el("path", { d:`M${h.x-w/2-6} ${h.y-hh/2} L${h.x} ${h.y-hh/2-w*0.42} L${h.x+w/2+6} ${h.y-hh/2} Z`, fill: h.id==="hall" ? "var(--lamp)" : "var(--roof)" }, g);
+  el("rect", { x:h.x-w*0.12, y:h.y-hh*0.05, width:w*0.24, height:hh*0.55, fill:"var(--lamp)" }, g);
+  const t = el("text", { x:h.x, y:h.y+hh/2+16, "text-anchor":"middle", class:"label" }, g); t.textContent = h.name;
+  const s = el("text", { x:h.x, y:h.y+hh/2+29, "text-anchor":"middle", class:"size" }, g); s.textContent = h.size;
+  const pick = () => select(h.id);
+  g.addEventListener("click", pick);
+  g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+});
+const panel = document.getElementById("panel");
+function select(id) {
+  const h = byId[id];
+  document.querySelectorAll(".house").forEach(g => g.classList.toggle("active", g.dataset.id === id));
+  panel.innerHTML = `<div class="eyebrow"></div><h2></h2><div class="agent"></div><p></p><ul></ul>`;
+  panel.querySelector(".eyebrow").textContent = h.order;
+  panel.querySelector("h2").textContent = h.name;
+  panel.querySelector(".agent").textContent = "Agent: " + h.agent + "  ·  Size: " + h.size;
+  panel.querySelector("p").textContent = h.text;
+  const ul = panel.querySelector("ul"); h.notes.forEach(n => { const li = document.createElement("li"); li.textContent = n; ul.appendChild(li); });
+}
+select("hall");
+</script>

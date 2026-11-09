@@ -1,0 +1,57 @@
+#!/bin/zsh
+# Harry Potter CoS launcher: the game reads and writes next to its own binary, so it runs
+# from a per-user folder whose read-only parts point back into this app.
+contents=${0:A:h:h}
+game="$contents/Resources/game"
+support="$HOME/Library/Application Support/HarryPotterCoS"
+logs="$HOME/Library/Logs/HarryPotterCoS"
+run="$support/run"
+mkdir -p "$run" "$support/saves" "$logs"
+
+# Read-only pieces: links into the app (refreshed every launch, so app updates apply).
+for item in HarryPotterCoS disc bios assets psx_execution native-cpu-spans native-idle-wait; do
+  ln -sfn "$game/$item" "$run/$item"
+done
+# Settings that ship with the app: always the app's copy.
+for f in game.toml game_options.toml; do cp -f "$game/$f" "$run/$f"; done
+# Controls and mods the player may change in the in-game menu: copied once.
+for f in input.ini keybinds.ini overlay_captures.json; do [[ -e "$run/$f" ]] || cp "$game/$f" "$run/$f"; done
+[[ -d "$run/mods" ]] || cp -R "$game/mods" "$run/mods"
+[[ -d "$run/overlay_captures.json.d" ]] || cp -R "$game/overlay_captures.json.d" "$run/"
+# Precompiled level code: add anything new from the app, never remove what was built here.
+rsync -a --ignore-existing "$game/cache/" "$run/cache/"
+
+# Saves stay on this Mac, unless the app runs straight from an external drive (a "cartridge").
+# Then the player picks, once per Mac: saves only on the drive, or on the drive and this Mac.
+save_dir="$support/saves"
+if [[ $contents == /Volumes/* ]]; then
+  vol="/Volumes/${${contents#/Volumes/}%%/*}"
+  cart="$vol/Arcade Saves/${support:t}"
+  mkdir -p "$cart/saves"
+  mac_id=$(ioreg -rd1 -c IOPlatformExpertDevice | awk -F'"' '/IOPlatformUUID/{print $4}')
+  mode_file="$cart/save-mode-$mac_id.txt"
+  mode=$(cat "$mode_file" 2>/dev/null)
+  if [[ $mode != drive && $mode != both ]]; then
+    choice=$(osascript -e 'button returned of (display dialog "Stai giocando da un disco esterno.\nDove vuoi salvare i progressi?" buttons {"Solo sul disco", "Disco e questo Mac"} default button 2 with icon note)' 2>/dev/null)
+    [[ $choice == "Solo sul disco" ]] && mode=drive || mode=both
+    echo $mode > "$mode_file"
+  fi
+  if [[ $mode == both ]]; then
+    newest() { find "$1" -type f ! -name '._*' -exec stat -f %m {} + 2>/dev/null | sort -n | tail -1 }
+    mac_time=$(newest "$support/saves"); drive_time=$(newest "$cart/saves")
+    # Never delete, never replace a newer save with an older one, and keep any replaced file
+    # in a dated backup folder on the side it was replaced on.
+    stamp=$(date +%Y-%m-%d_%H-%M-%S)
+    (( ${mac_time:-0} > ${drive_time:-0} )) &&
+      rsync -rtu --exclude='._*' --backup --backup-dir="$cart/save-backups/$stamp" "$support/saves/" "$cart/saves/"
+    # Copy progress back to this Mac once the game (this same process, after exec) has quit.
+    ( while kill -0 $$ 2>/dev/null; do sleep 2; done
+      rsync -rtu --exclude='._*' --backup --backup-dir="$support/save-backups/$(date +%Y-%m-%d_%H-%M-%S)" \
+        "$cart/saves/" "$support/saves/" ) &!
+  fi
+  save_dir="$cart/saves"
+fi
+
+cd "$run"
+export PSX_WINDOW_TITLE_FONT="$contents/Resources/title-font.ttf" PSX_WINDOW_TITLE_FONT_SIZE=17
+exec "$run/HarryPotterCoS" --no-launcher --memcard-dir "$save_dir" "$@" >"$logs/harry.log" 2>&1

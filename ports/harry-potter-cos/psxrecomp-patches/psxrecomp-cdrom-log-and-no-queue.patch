@@ -1,0 +1,106 @@
+diff --git a/runtime/src/cdrom.c b/runtime/src/cdrom.c
+index de431129..97943fbd 100644
+--- a/runtime/src/cdrom.c
++++ b/runtime/src/cdrom.c
+@@ -936,7 +936,22 @@ static void response_push(uint8_t val) {
+     }
+ }
+ 
++/* PSX_CD_CMD_LOG=1 also prints every CD INT (see exec_command). */
++static int cd_cmd_log_enabled(void) {
++    static int enabled = -1;
++    if (enabled < 0) {
++        const char *e = getenv("PSX_CD_CMD_LOG");
++        enabled = (e && *e && *e != '0') ? 1 : 0;
++    }
++    return enabled;
++}
++
+ static void set_irq(int type) {
++    if (cd_cmd_log_enabled()) {
++        fprintf(stderr, "[cdint] INT%d resp=%02X last_lba=%d frame=%u\n", type,
++                response_count > 0 ? response_fifo[0] : 0xFF, last_sector_lba,
++                (uint32_t)s_frame_count);
++    }
+     irq_flag = (uint8_t)type;
+     /* New visible CD INT generation: it has not yet been presented to INTC,
+      * so re-arm the latch (the delayed present below raises it once). */
+@@ -1597,7 +1612,18 @@ static int      pending_dataready_slot;   /* ring slot THIS INT1 announces */
+  * delivering inline, "give it enough time to read the response out ... the
+  * real console does something similar anyway, the INT1 task won't run
+  * immediately after the INT3 is cleared." */
+-#define CDROM_PEND_PRESENT_DELAY 500
++/* Experiment knob: PSX_CD_PEND_DELAY overrides the delay (Beetle's
++ * CDCReadyReceiveCounter is 2000 cycles after a WriteIRQ). */
++static uint64_t cdrom_pend_present_delay(void) {
++    static long delay = -1;
++    if (delay < 0) {
++        const char *e = getenv("PSX_CD_PEND_DELAY");
++        delay = (e && *e) ? strtol(e, NULL, 0) : 500;
++        if (delay < 0) delay = 500;
++    }
++    return (uint64_t)delay;
++}
++#define CDROM_PEND_PRESENT_DELAY cdrom_pend_present_delay()
+ static uint64_t pending_present_due;
+ static uint64_t s_int1_pended;            /* INT1s that had to wait for ack */
+ static uint64_t s_int1_lost;              /* pended INT1s replaced unseen */
+@@ -2039,7 +2065,15 @@ static void try_execute_queued_command(void) {
+ }
+ 
+ static void queue_or_exec_command(uint8_t cmd) {
+-    if (irq_flag == 0) {
++    /* Run a command even while an INT is unacked, the way Beetle schedules it
++     * regardless of IRQBuffer (Harry Potter CoS deadlocks otherwise).
++     * PSX_CD_NO_QUEUE=0 restores the old queueing. */
++    static int no_queue = -1;
++    if (no_queue < 0) {
++        const char *e = getenv("PSX_CD_NO_QUEUE");
++        no_queue = (e && *e == '0') ? 0 : 1;
++    }
++    if (irq_flag == 0 || no_queue) {
+         exec_command(cmd);
+         return;
+     }
+@@ -2133,6 +2167,23 @@ static void exec_command(uint8_t cmd) {
+     if (cmd_param_count < 0) cmd_param_count = 0;
+     if (cmd_param_count > PARAM_FIFO_SIZE) cmd_param_count = PARAM_FIFO_SIZE;
+     memcpy(cmd_params, param_fifo, (size_t)cmd_param_count);
++    /* PSX_CD_CMD_LOG=1: print every CD command as it dispatches, so a wedge
++     * that stops the debug server (no more vblanks) still leaves the command
++     * sequence on stderr for comparison with psx-beetle's cdrom_cmd_dump.
++     * Kept in release builds: a wedge in a player's build needs it too. */
++    {
++        static int log_cmds = -1;
++        static uint32_t log_seq = 0;
++        if (log_cmds < 0) {
++            const char *e = getenv("PSX_CD_CMD_LOG");
++            log_cmds = (e && *e && *e != '0') ? 1 : 0;
++        }
++        if (log_cmds) {
++            fprintf(stderr, "[cdcmd] seq=%u cmd=0x%02X n=%d", log_seq++, cmd, cmd_param_count);
++            for (int i = 0; i < cmd_param_count; i++) fprintf(stderr, " %02X", cmd_params[i]);
++            fprintf(stderr, " frame=%u\n", (uint32_t)s_frame_count);
++        }
++    }
+     response_clear();
+ 
+     switch (cmd) {
+@@ -3110,6 +3161,17 @@ void cdrom_advance(uint32_t cycles) {
+      * it. Note: do NOT freeze CD during rollback Replay. MotK FMV skip resim
+      * resumes into VLC/sector waits; frozen IRQs → no finish_frame hang.
+      * Menu CD asymmetry is contained by no-invent during media + core POST. */
++    if (cd_cmd_log_enabled()) {
++        static uint64_t next_status = 0;
++        if (psx_cycle_count >= next_status) {
++            next_status = psx_cycle_count + 33868800u;   /* about once per guest second */
++            fprintf(stderr, "[cdstat] cyc=%llu reading=%d read_cmd=%02X read_delay=%d irq_flag=%d "
++                    "irq_enable=%02X pend_int1=%d queued=%d pending=%d stat=%02X ring=%d warm_block=%d\n",
++                    (unsigned long long)psx_cycle_count, reading, read_cmd, read_delay, irq_flag,
++                    irq_enable, pending_dataready, queued_cmd.pending, pending.pending, stat_reg,
++                    rb_available(), warm_route_consumer_blocked());
++        }
++    }
+     process_lid_state();
+     refresh_cdrom_irq_line();
+     process_pending(cycles);

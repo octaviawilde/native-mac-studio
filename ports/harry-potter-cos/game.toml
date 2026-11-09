@@ -1,0 +1,56 @@
+# Autofilled by tools/new_project_layout/probe_disc.py from your legal dump.
+# Review before shipping. Runtime quirks / overlay seeds still need hand work.
+
+[game]
+name = "HarryPotterCoS"
+id = "SLUS-01503"
+players = 1
+exe = "disc/SLUS_015.03"
+disc = "disc/<your game>.cue"
+load_address = "0x00100000"
+entry_pc = "0x00105130"
+text_size = "0x00011800"
+stack_base = "0x801FFFF0"
+
+# Digests are for data Track 01 (first BINARY FILE / TRACK 01).
+[prepare_disc]
+out_dir = "disc"
+bin_name = "Harry Potter and the Chamber of Secrets (USA, Canada) (En,Fr,Es).bin"
+cue_name = "Harry Potter and the Chamber of Secrets (USA, Canada) (En,Fr,Es).cue"
+boot_exe = "SLUS_015.03"
+known_sizes = [706420848]
+known_md5 = [
+  "835a0390f345a37a8226e696db994b86",
+]
+known_sha1 = [
+  "1138250c591443c305f6c58a07b8473da1fdec01",
+]
+known_crc32 = [
+  "65698f33",
+]
+
+[recompiler]
+seeds = "seeds/ghidra_funcs.txt"
+out_dir = "generated"
+strict = true
+
+[runtime]
+window_title = "HarryPotterCoS Recompiled"
+memcard_dir = "saves"
+overlay_cache = true
+
+[video]
+renderer = "opengl"
+aspect_ratio = "4:3"
+
+[controller]
+default_mode = "digital"
+# Player 1: first connected controller; keyboard when none is plugged in.
+p1_device = "auto"
+
+# Online mount gate: digests + track count + optional TOC fingerprint
+# (see docs/NETPLAY.md).
+[netplay]
+require_cue = true
+required_tracks = 1
+required_disc_fp = "08519be50b95fbf761ce2146890d3b2ffe28b305361783932b6413ecc345b922"

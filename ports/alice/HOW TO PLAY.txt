@@ -1,0 +1,37 @@
+ALICE: MADNESS RETURNS for Mac
+==============================
+
+Needs: a Mac with Apple Silicon (M1, M2, M3, M4 or newer) and macOS 14 Sonoma or newer.
+No internet needed, nothing else to install.
+
+Copy to another Mac
+-------------------
+1. Copy "Alice Madness Returns.app" to a USB stick (about 5 GB; any stick format works).
+2. On the other Mac, drag it into the Applications folder.
+3. Double-click it. The very first start takes about a minute while macOS checks the new app.
+
+If macOS says the app "can't be opened" or is "from an unidentified developer":
+   Open System Settings > Privacy & Security, scroll down, and click "Open Anyway". Only once.
+
+Controls
+--------
+A controller is the best way to play (PS5 DualSense, Xbox pad or Nintendo Joy-Cons; USB or
+Bluetooth). Buttons work by position like an Xbox pad, so follow the game's own on-screen prompts:
+   bottom = A    right = B    left = X    top = Y    Start/Options/+ = pause
+Joy-Cons: a left + right pair is one controller.
+
+Keyboard (each key stands in for an Xbox button):
+   W A S D = left stick (move)      Arrow keys = right stick (camera)
+   Space = A    K = B    J = X    I = Y
+   Q / E = left / right bumper      O / P = left / right trigger
+   1 2 3 4 = D-pad up / right / down / left
+   Return or Escape = Start (pause)    Tab = Back    Shift = left stick click    F3 = frame rate
+
+Saves and settings
+------------------
+Saves and logs are stored per Mac in:
+   ~/Library/Application Support/AliceMadnessReturns
+   ~/Library/Logs/AliceMadnessReturns
+To move your saves to the other Mac, copy the "user" folder from there.
+
+Quit with Cmd+Q or by closing the window.

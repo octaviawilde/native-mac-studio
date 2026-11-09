@@ -1,0 +1,35 @@
+Tekken 6 for macOS: what this folder is built on
+=================================================
+
+This folder holds only our own macOS changes. The project it builds on is not included,
+because it has no license file and so cannot be redistributed here. Get it from its own
+repository.
+
+1. tekken6-recomp (the Tekken 6 static-recompilation project)
+   URL:     https://github.com/mahmoud-mess/tekken6-recomp
+   Commit:  3efad760bf2a   (2026-10-16, version 0.9.4, "Keep release documentation focused on the main builder")
+   Our change to it:  tekken6-recomp-mac.patch   (CMakeLists.txt only)
+
+2. ReXGlue SDK (its submodule third_party/rexglue-sdk)
+   URL:     https://github.com/rexglue/rexglue-sdk
+   Commit:  0c7b01a0ac0479801757507d80533f662fa0815d   (tag nightly-20260904-0c7b01a0; also in sdk-patch/BASE.txt)
+   Their change to it: patches/rexglue/0001-tekken6-runtime.patch   (inside tekken6-recomp)
+   Our change on top:  sdk-patch/rexglue-sdk-mac.patch              (includes the new file src/ui/title_font_mac.mm)
+
+Build order (run from this folder)
+----------------------------------
+  git clone https://github.com/mahmoud-mess/tekken6-recomp
+  cd tekken6-recomp
+  git checkout 3efad760bf2a
+  git apply ../tekken6-recomp-mac.patch                  # 1. our project change
+  git submodule update --init --recursive                # 2. rexglue-sdk at BASE
+  python3 tools/apply_rexglue_patches.py                 # 3. their SDK patch
+  git -C third_party/rexglue-sdk apply ../../../sdk-patch/rexglue-sdk-mac.patch   # 4. our SDK delta
+
+The order matters: our SDK delta is a diff against "BASE + their patch" and does not apply
+to a clean SDK. Checked: BASE + their patch + our delta gives exactly the SDK tree our
+builds use.
+
+Note: after we started, tekken6-recomp gained its own macOS support (October 2026). Newer
+commits will not take these patches as they are; use the commit above, or use upstream's
+own macOS build.

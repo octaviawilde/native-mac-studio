@@ -1,0 +1,31 @@
+# Build outputs
+build/
+build-*/
+dist/
+out/
+*.app
+*.dSYM/
+.DS_Store
+
+# Never publish: game data and anything derived from it
+generated/
+game/
+disc/
+cache/
+saves/
+*.mcd
+*.sav
+*.iso
+*.xex
+*.bin
+*.cue
+*.img
+*.chd
+*.7z
+SLUS*
+SCUS*
+SLES*
+overlay_captures.json*
+*.ppm
+*.icns
+run/

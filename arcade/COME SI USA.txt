@@ -1,0 +1,15 @@
+ARCADE - la sala giochi dello studio
+
+Metti Arcade.app in Applicazioni (la prima volta: clic destro > Apri > Apri).
+Trova da solo i giochi dello studio in Applicazioni e nella sua stessa cartella
+(es. una chiavetta o un disco con Arcade e i giochi insieme).
+
+                 Controller (qualsiasi)      Tastiera
+Muoviti          croce / levetta sinistra    frecce o WASD
+Gioca            tasto in basso              Invio o Spazio
+Esci             tasto a destra              Esc
+Schermo intero   Menu / Options              F
+Mouse: clic su un gioco per sceglierlo, doppio clic per giocare.
+
+La barra in basso mostra sempre i tasti del dispositivo che hai usato per ultimo.
+Mentre giochi, Arcade si nasconde e ricompare quando chiudi il gioco.
